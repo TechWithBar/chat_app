@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="message-box">
+    <div class="room-header">
+        <h2>Room Code: <b>{{code}}</b></h2>
+        <button class="leave-btn" onclick="leave()">Leave Room</button>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="inputs">
+        <input 
+            type="text" 
+            placeholder="Type your message..." 
+            name="message" 
+            id="message"
+            autocomplete="off"
+        />
+        <button type="button" name="send" id="send-btn" onclick="sendMessage()">
+            Send
+        </button>
+    </div>
+</div>
+<script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

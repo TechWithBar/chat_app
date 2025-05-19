@@ -1,0 +1,18 @@
+{% extends "base.html" %} {% block content %}
+<form method="post" class="buttons">
+    <h3>Sign up</h3>
+    <h4>Username:</h1>
+    <input type="text" placeholder="username" name="username" value="{{username}}"/>
+    <h4>Password:</h1>
+    <input type="password" placeholder="password" name="password"/>
+    <h4>Confirm Password:</h1>
+    <input type="password" placeholder="confirm password" name="confirm_password"/>
+    <button type="submit" name="sign_up" class="login-btn">Sign Up</button>
+    {% if error %}
+    <ul>
+        <li>{{error}}</li>
+    </ul>
+    {% endif %}
+    <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a>.</p>
+</form>
+{% endblock %}
