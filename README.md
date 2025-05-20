@@ -39,7 +39,7 @@ To get you IP enter **ipconfig** in **cmd**.
 
 ## How to view and edit the code?
 
-1. Open the project's folder in vs code (if you don't have VS Code installed, download it from the official website).
+1. Open the project's folder in Visual Studio Code (if you don't have VS Code installed, download it from the official website).
 
 2. Install required extensions:
     - Go to **Extensions** (Ctrl + Shift + X)

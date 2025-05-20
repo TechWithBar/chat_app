@@ -2,8 +2,9 @@ from chacha import ChaCha
 from ecdh import ECDH
 from secp256r1 import *
 
-# !!!
+# !!!!!!!!!!!!!!!!
 # Before running: change the import in ecdh.py to - from secp256r1 import *
+# !!!!!!!!!!!!!!!!
 
 if __name__ == "__main__":
     ecdh = ECDH(a, b, p, n, Gx, Gy)

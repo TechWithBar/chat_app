@@ -13,13 +13,14 @@ export class ChaCha {
         [3, 4, 9, 14],
     ];
 
+    /** 
+     * Initialize the ChaCha cipher with a 256-bit key and 96-bit nonce. 
+     * @param {Uint8Array} key - 32-byte (256-bit) key.
+     * @param {Uint8Array} nonce - 12-byte (96-bit) nonce.
+     * @param {number} counter - Initial block counter.
+     * @param {number} rounds - The number of rounds.
+     */
     constructor(key, nonce, counter = 0, rounds = 20) {
-        /** Initialize the ChaCha cipher with a 256-bit key and 96-bit nonce. 
-         * @param {Uint8Array} key - 32-byte (256-bit) key.
-         * @param {Uint8Array} nonce - 12-byte (96-bit) nonce.
-         * @param {number} counter - Initial block counter.
-         * @param {number} rounds - The number of rounds.
-         */
         if (key.length !== 32) {
             throw new Error("Key must be 32 bytes (256 bits) long");
         }
@@ -32,11 +33,13 @@ export class ChaCha {
         this.rounds = rounds;
     }
 
+    /** 
+     * Converts an array of 32-bit words into a byte array using little-endian order.
+     * Each 32-bit word is split into 4 bytes: least significant byte first.
+     * @param {Array} state - The state array.
+     * @returns {Uint8Array} The byte array.
+     */
     static wordToByteArray(state) {
-        /** Convert the state to a little-endian byte stream.
-         * @param {Array} state - The state array.
-         * @returns {Uint8Array} The byte array.
-         */
         const byteArray = new Uint8Array(state.length * 4);
         for (let i = 0; i < state.length; i++) {
             byteArray[i * 4] = state[i] & 0xff;
@@ -47,11 +50,13 @@ export class ChaCha {
         return byteArray;
     }
 
+    /** 
+     * Converts a byte array (in little-endian order) to an array of 32-bit unsigned words.
+     * Each group of 4 bytes is combined into one 32-bit word.
+     * @param {Uint8Array} data - The byte array.
+     * @returns {Array} The array of 32-bit words.
+     */
     static byteArrayToWords(data) {
-        /** Convert a byte array to an array of 32-bit words.
-         * @param {Uint8Array} data - The byte array.
-         * @returns {Array} The array of 32-bit words.
-         */
         const ret = [];
         for (let i = 0; i < data.length; i += 4) {
             const word = (data[i]) |
@@ -63,6 +68,11 @@ export class ChaCha {
         return ret;
     }
 
+    /**
+     * Converts a hexadecimal string into plaintext (UTF-8).
+     * @param {string} hexString 
+     * @returns {string} The decoded UTF-8 plaintext.
+     */
     static hexToPlainText(hexString) {
         if (typeof hexString !== 'string' || hexString.length % 2 !== 0) {
             throw new Error("Invalid hex string");
@@ -76,25 +86,25 @@ export class ChaCha {
         return new TextDecoder().decode(bytes);
     }
 
+    /** 
+     * Rotate left a 32-bit integer x by y bits.
+     * @param {number} x - The integer to rotate.
+     * @param {number} y - The number of bits to rotate.
+     * @returns {number} The rotated integer.
+     */
     static rotl32(x, y) {
-        /** 
-         * Rotate left a 32-bit integer x by y bits.
-         * @param {number} x - The integer to rotate.
-         * @param {number} y - The number of bits to rotate.
-         * @returns {number} The rotated integer.
-         */
         return ((x << y) | (x >>> (32 - y))) >>> 0;
     }
 
+    /**
+     * Perform a ChaCha quarter round operation on four elements of the state.
+     * @param {number[]} x - The state array.
+     * @param {number} a - Index of first element.
+     * @param {number} b - Index of second element.
+     * @param {number} c - Index of third element.
+     * @param {number} d - Index of fourth element.
+     */
     static quaterRound(x, a, b, c, d) {
-        /**
-         * Perform a ChaCha quarter round operation on four elements of the state.
-         * @param {number[]} x - The state array.
-         * @param {number} a - Index of first element.
-         * @param {number} b - Index of second element.
-         * @param {number} c - Index of third element.
-         * @param {number} d - Index of fourth element.
-         */
         let xa = x[a];
         let xb = x[b];
         let xc = x[c];
@@ -122,22 +132,22 @@ export class ChaCha {
         x[d] = xd;
     }
 
+    /** 
+     * Perform two rounds of ChaCha cipher.
+     * @param {number[]} x - The state array.
+     */
     static doubleRound(x) {
-        /** 
-         * Perform two rounds of ChaCha cipher.
-         * @param {number[]} x - The state array.
-         */
         for (const [a, b, c, d] of ChaCha.roundMixupBox) {
             ChaCha.quaterRound(x, a, b, c, d);
         }
     }
 
+    /** 
+     * Generates a state of a single block.
+     * @param {number} counter - The block counter.
+     * @returns {Uint8Array} The generated block.
+     */
     chachaBlock(counter) {
-        /** 
-         * Generates a state of a single block.
-         * @param {number} counter - The block counter.
-         * @returns {Uint8Array} The generated block.
-         */
         const state = [
             ...ChaCha.constants,
             ...this.key,
@@ -160,17 +170,17 @@ export class ChaCha {
         return ChaCha.wordToByteArray(result);
     }
 
+    /** 
+     * Generates a keystream block.
+     * @param {number} counter - The block counter.
+     * @returns {Uint8Array} The generated keystream block.
+     */
     keyStream(counter) {
-        /** 
-         * Generates a keystream block.
-         * @param {number} counter - The block counter.
-         * @returns {Uint8Array} The generated keystream block.
-         */
         return this.chachaBlock(this.counter + counter);
     }
 
+    /** Increments the nonce. */
     raiseNonce() {
-        /** Increments the nonce. */
         for (let i = 0; i < 3; i++) {
             this.nonce[i] = (this.nonce[i] + 1) >>> 0; // Add 1 and wrap at 2^32
             if (this.nonce[i] !== 0) {
@@ -179,12 +189,12 @@ export class ChaCha {
         }
     }
 
+    /** 
+     * Encrypt plaintext (string or Uint8Array) and return hex string of encrypted bytes.
+     * @param {string | Uint8Array} plaintext 
+     * @returns {string} hex string
+     */
     encrypt(plaintext) {
-        /** 
-         * Encrypt plaintext (string or Uint8Array) and return hex string of encrypted bytes.
-         * @param {string | Uint8Array} plaintext 
-         * @returns {string} hex string
-         */
         if (typeof plaintext === 'string') {
             plaintext = new TextEncoder().encode(plaintext);
         } else if (!(plaintext instanceof Uint8Array)) {
@@ -208,12 +218,12 @@ export class ChaCha {
         return Array.from(encryptedMessage).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    /**
+     * Decrypt ciphertext hex string and return UTF-8 plain string.
+     * @param {string} hexCiphertext
+     * @returns {string}
+     */
     decrypt(hexCiphertext) {
-        /**
-         * Decrypt ciphertext hex string and return UTF-8 plain string.
-         * @param {string} hexCiphertext
-         * @returns {string}
-         */
         if (typeof hexCiphertext !== 'string') {
             throw new TypeError('Ciphertext must be a hex string');
         }

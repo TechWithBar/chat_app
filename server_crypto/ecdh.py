@@ -1,4 +1,4 @@
-# !!! If you run code from server_crypto folder do this:
+# !!! If you run _example.py do this and not line 3:
 # from secp256r1 import *
 from server_crypto.secp256r1 import *
 import hashlib
@@ -52,6 +52,7 @@ class Point:
 
         p = self.curve.p
 
+        # m is the slope
         if self == other:
             # point doubling
             m = (3 * self.x ** 2 + self.curve.a) * pow(2 * self.y, -1, p)
@@ -69,12 +70,20 @@ class Point:
         if k < 1 or k >= self.curve.n:
             raise ValueError("k must be in the range [1, n-1]")
         result = Point(None, None, self.curve)
+
+        # Start with the current point as the addend
         addend = self
 
+        # Loop through each bit of k (from least significant to most significant)
         while k:
+            # If the current least significant bit is 1, add the addend to the result
             if k & 1:
                 result += addend
+
+            # Double the point for the next bit
             addend += addend
+
+            # Shift k right by 1 bit
             k >>= 1
 
         return result
@@ -89,7 +98,7 @@ class Point:
 class ECDH:
     """Elliptic Curve Diffie Hellman key exchange."""
 
-    def __init__(self, a, b, p, n, Gx, Gy):
+    def __init__(self, a: int, b: int, p: int, n: int, Gx: int, Gy: int):
         self.a = a
         self.b = b
         self.p = p
@@ -103,13 +112,15 @@ class ECDH:
             raise ValueError("(n-1)*G is infinity — invalid n")
 
     def is_on_curve(self, point: Point):
+        """Check if a point is on the curve by placing the point in 
+        the equasion and checking if it is true."""
         if point.is_at_infinity():
             return True
         x, y = point.x, point.y
         return (y * y - x ** 3 - self.a * x - self.b) % self.p == 0
     
     def generate_private_key(self):
-        """Generate a secure random private key."""
+        """Generate a secure random private key with the secrets library."""
         return secrets.randbelow(self.n - 1) + 1
 
     def generate_public_key(self, private_key: int):

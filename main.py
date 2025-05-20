@@ -18,9 +18,10 @@ app.config['SECRET_KEY'] = 'secret_key'
 socketio = SocketIO(app, async_mode='eventlet')
 
 rooms = {}
-
+ROOM_CODE_LEN = 4
 
 def generate_unique_room_code(length):
+    """Generates random code of capital letters with this length."""
     while True:
         code = ''
         for _ in range(length):
@@ -33,16 +34,22 @@ def generate_unique_room_code(length):
 
 
 def hash_password(password):
+    """Hash password with bcrypt"""
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed
 
 
 def check_password(password, hashed):
+    """
+    Checks if the hash of the entered password is the same as 
+    the hash of the saved password.
+    """
     return bcrypt.checkpw(password.encode('utf-8'), hashed)
  
 
 def load_users():
+    """Loads all of the users saved in the json file"""
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r") as f:
             return json.load(f)
@@ -50,11 +57,16 @@ def load_users():
 
 
 def save_users(users):
+    """
+    Updates the users json file with a new updated users.
+    :param users: (dict) Usernames as keys and hashed passwords as values.
+    """
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
 
 
 def register(username, password):
+    """Adds new user to the json file if it does not already exists."""
     users = load_users()
     if username in users:
         return "username already exists."
@@ -65,6 +77,7 @@ def register(username, password):
 
 
 def login_user(username, password):
+    """Login the user if the username and password exist in the users json file."""
     users = load_users()
     if username not in users:
         return "username not found."
@@ -85,6 +98,9 @@ def start():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    session.pop('room', None)
+    session.pop('name', None)
+    session.pop('user', None)
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -105,6 +121,9 @@ def login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register_user():
+    session.pop('room', None)
+    session.pop('name', None)
+    session.pop('user', None)
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -127,6 +146,7 @@ def register_user():
 
 @app.route('/home', methods=['GET', 'POST'])
 def home():
+    """From home page you can join a room or create a room."""
     session.pop('room', None)
     session.pop('name', None)
     if session.get('user') is None:
@@ -144,26 +164,44 @@ def home():
             return redirect(url_for('login'))
 
         if not name:
-            return render_template('home.html', error='Please enter a name.', code=code, name=name)
+            return render_template('home.html', 
+                                   error='Please enter a name.', 
+                                   code=code, 
+                                   name=name)
         
         if len(name) > 25:
-            return render_template('home.html', error='Name is more then 25 characters.', code=code, name=name)
+            return render_template('home.html', 
+                                   error='Name is more then 25 characters.', 
+                                   code=code, 
+                                   name=name)
 
         if join != False and not code:
-            return render_template('home.html', error='Please enter a room code to join.', code=code, name=name)
+            return render_template('home.html', 
+                                   error='Please enter a room code to join.', 
+                                   code=code, 
+                                   name=name)
 
         room = code
         if create != False:
-            room = generate_unique_room_code(4)
-            rooms[room] = {'members': 0, 'clients': {}, 'names': set()}
+            room = generate_unique_room_code(ROOM_CODE_LEN)
+            while room in rooms:
+                room = generate_unique_room_code(ROOM_CODE_LEN)
+            rooms[room] = {'clients': {}, 'names': set()}
         elif code not in rooms:
-            return render_template('home.html', error='Room does not exist.', code=code, name=name)
+            return render_template('home.html', 
+                                   error='Room does not exist.', 
+                                   code=code, 
+                                   name=name)
 
         session['room'] = room
         session['name'] = name
 
         if name in rooms[room]['names']:
-            return render_template('home.html', error='This name is already in use in the room.', code=code, name=name)
+            return render_template('home.html', 
+                                   error='This name is already in use in the room.', 
+                                   code=code, 
+                                   name=name)
+        
         rooms[room]['names'].add(name)
         return redirect(url_for('room'))
 
@@ -173,6 +211,9 @@ def home():
 @app.route('/room')
 def room():
     room = session.get('room')
+
+    if session.get('user') is None:
+        return redirect(url_for('login'))
     
     if room is None or session.get('name') is None or room not in rooms:
         return redirect(url_for('home'))
@@ -182,6 +223,15 @@ def room():
 
 @socketio.on('publicKey')
 def share_pubkey(data):
+    """
+    This function is responsible for the key exchange with the client and the server.
+    The client send his public key and the server sends back his own public key so they
+    both can generate their shared key.
+    The server saves the shared key in a dictionary, with the sid as the key and the 
+    ChaCha object of the client (with that sid) as the value.
+
+    :param data: (dict) With the clients public key (x and y).
+    """
     room = session.get('room')
     client_sid = request.sid
     client_pub = data['client_publicKey']
@@ -200,46 +250,57 @@ def share_pubkey(data):
         }
     }
     emit('server_publicKey', server_pubkey_dict, to=client_sid)
-    rooms[room]['clients'][client_sid] = ChaCha(shared_key, ecdh.generate_shared_nonce(shared_key))
+    # Save the shared key
+    rooms[room]['clients'][client_sid] = ChaCha(shared_key, 
+                                                ecdh.generate_shared_nonce(shared_key))
 
 
 @socketio.on('message')
 def message(data):
+    """
+    This function is responsible for recieving an encrypted message from a client, decrypting it, 
+    and sending their message ecrypted to each other client in the room.
+    """
     room = session.get('room')
+    name = session.get('name')
     client_sid = request.sid
-    if room not in rooms or client_sid not in rooms[room]['clients']:
+    if room not in rooms or client_sid not in rooms[room]['clients'] or name is None:
         return
     
+    # Get the client ChaCha object
     chacha_sender = rooms[room]['clients'][client_sid]
+
+    # Decrypt the message
     try:
         plaintext = chacha_sender.decrypt(data['data'])
     except Exception:
         plaintext = "[decryption error]"
-    content = {
-        'name': session.get('name'),
-        'message': data['data']
-    }
     
+    # Send it encrypted to each client with their own shared key
     for sid, chacha_client in rooms[room]['clients'].items():
+        if sid == client_sid:
+            continue
         try:
             encrypted = chacha_client.encrypt(plaintext)
         except Exception:
             encrypted = ""
-        send({'name': session.get('name'), 'encrypted': encrypted}, to=sid)
+        send({'name': name, 'encrypted': encrypted}, to=sid)
 
 
 @socketio.on('connect')
 def connect():
+    """
+    This function is responsible for when a client starts a socket with the server,
+    which is when he joins a room. It adds the client to the room in the rooms dictionary
+    and sends the 'has joined the room' message to each client in the room.
+    """
     room = session.get('room')
     name = session.get('name')
     if not room or not name:
         return
     if room not in rooms:
-        leave_room(room)
         return
-    
-    join_room(room)
-    rooms[room]['members'] += 1
+
     rooms[room]['names'].add(name)
 
     plaintext = 'has joined the room'
@@ -253,18 +314,22 @@ def connect():
 
 @socketio.on('disconnect')
 def disconnect():
+    """
+    This function is responsible for when a client disconnects from the socket, 
+    which is when he leaves the room. It deletes the client from the rooms dictionary
+    and send the 'has left the room message to each other client in the room.
+    If the room is empty it deletes the room.
+    """
     room = session.get('room')
     name = session.get('name')
     client_sid = request.sid
-    leave_room(room)
 
     if room in rooms:
-        rooms[room]['members'] -= 1
-        if rooms[room]['members'] <= 0:
+        rooms[room]['names'].remove(name)
+        if len(rooms[room]['names']) == 0:
             del rooms[room]
         else:
             rooms[room]['clients'].pop(client_sid, None)
-            rooms[room]['names'].remove(name)
 
             plaintext = 'has left the room'
             for sid, chacha_recipient in rooms[room].get('clients', {}).items():
@@ -279,3 +344,7 @@ if __name__ == '__main__':
     # For running it locali with debuging:
     # socketio.run(app, debug=True)
     socketio.run(app, host='0.0.0.0', port=5000, keyfile='key.pem', certfile='cert.pem')
+    # If you run it with host='0.0.0.0':
+    # To enter the website: https://type_your_ipv4_here:5000
+    # remember to type: **https**
+    # and not http

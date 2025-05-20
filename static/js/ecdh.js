@@ -5,19 +5,30 @@ const Gx = BigInt('0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d89
 const Gy = BigInt('0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5');
 const n = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
 
+/** 
+ * Returns a Promise resolving to a Uint8Array of the SHA-256 hash of the input key.
+ * @param {Uint8Array} key 
+ * @returns {Promise<Uint8Array>}
+ */
 function sha256(key) {
-	/** 
-	 * Returns a Promise resolving to a Uint8Array of the SHA-256 hash of the input key.
-	 * @param {Uint8Array} key 
-	 * @returns {Promise<Uint8Array>}
-	 */
 	return crypto.subtle.digest('SHA-256', key).then(hashBuffer => new Uint8Array(hashBuffer));
 }
 
+/**
+ * Modulu function so that the answer won't be negative (n % m).
+ * @param {number} n 
+ * @param {number} m 
+ * @returns 
+ */
 function mod(n, m) {
 	return ((n % m) + m) % m;
 }
 
+/** 
+ * Modular inverse using Extended Euclidean Algorithm.
+ * @param {number} a
+ * @param {number} m
+ */
 function modinv(a, m) {
 	a = mod(a, m);
 	let m0 = m;
@@ -35,6 +46,13 @@ function modinv(a, m) {
 	return x1;
 }
 
+/**
+ * Converts a non-negative BigInt to a Uint8Array of specified length in big-endian order.
+ * Big-endian means the most significant byte is at the lowest index (start) of the array.
+ * @param {*} n - The bigint.
+ * @param {*} byteLength - the length of the output byte array.
+ * @returns {Uint8Array} A byte array representing the bigint in big-endian byte order.
+ */
 function bigintToBytes(n, byteLength = 32) {
 	if (n < 0n) throw new Error("Only non-negative BigInts supported");
 	const bytes = new Uint8Array(byteLength);
@@ -60,8 +78,8 @@ export class Point {
 		return this.x === null && this.y === null;
 	}
 
+	/** Checks if two points are the same. */
 	equals(other) {
-		/** Checks if two points are the same. */
 		return (
 			this.x === other.x &&
 			this.y === other.y &&
@@ -69,12 +87,12 @@ export class Point {
 		);
 	}
 
+	/** 
+	 * Adds two points on the elliptic curve.
+	 * @param {Point} other - The point to add.
+	 * @returns {Point} The resulting point.
+	 */
 	add(other) {
-		/** 
-		 * Adds two points on the elliptic curve.
-		 * @param {Point} other - The point to add.
-		 * @returns {Point} The resulting point.
-		 */
 		const { a, p } = this.curve;
 
 		if (this.curve !== other.curve) {
@@ -88,13 +106,14 @@ export class Point {
 			return new Point(null, null, this.curve); // Point at infinity
 		}
 
+		// The slope:
 		let m;
 
 		if (this.equals(other)) {
-		    // Point doubling
+		    // Point doubling (שיפוע משיק)
 			m = mod((3n * this.x ** 2n + a) * modinv(2n * this.y, p), p);
 		} else {
-			// Point addition
+			// Point addition (שיפוע הישר העובר בשתי הנקודות)
 			m = mod((other.y - this.y) * modinv(other.x - this.x, p), p);
 		}
 
@@ -105,22 +124,30 @@ export class Point {
 	}
 
 
+	/** Computes k * P using double-and-add algorithm.
+	 * @param {BigInt} k - The scalar multiplier.
+	 * @returns {Point} The resulting point.
+	 * @throws {Error} If k is not in the range [1, n-1].
+	*/
 	scalarMult(k) {
-		/** Computes k * P using double-and-add algorithm.
-		 * @param {BigInt} k - The scalar multiplier.
-		 * @returns {Point} The resulting point.
-		 * @throws {Error} If k is not in the range [1, n-1].
-		*/
-		if (k < 1n || k > this.curve.n - 1n) {
+		if (k < 1n || k >= this.curve.n) {
 			throw new Error("k must be in the range [1, n-1]");
 		}
 
 		let result = new Point(null, null, this.curve);
+
+		// Start with the current point as the addend
 		let addend = this;
 
+		// Loop through each bit of k (from least significant to most significant)
 		while (k > 0n) {
+			// If the current least significant bit is 1, add the addend to the result
 			if (k & 1n) result = result.add(addend);
+			
+			// Double the point for the next bit
 			addend = addend.add(addend);
+
+			// Shift k right by 1 bit
 			k >>= 1n;
 		}
 
@@ -153,8 +180,8 @@ class ECDH {
 		}
 	}
 
+	/** Checks if a point is on the curve. */
 	isOnCurve(point) {
-		/** Checks if a point is on the curve. */
 		if (point.isAtInfinity()) return true;
 		const { x, y } = point;
 		const left = mod(y ** 2n, this.p);
@@ -162,10 +189,11 @@ class ECDH {
 		return left === right;
 	}
 
+	/** 
+	 * Generates a random private key in the range [1, n-1].
+	 * @returns {BigInt} The private key.
+	*/
 	generatePrivateKey() {
-		/** Generates a random private key in the range [1, n-1].
-		 * @returns {BigInt} The private key.
-		*/
 		const byteLength = (this.n.toString(2).length + 7) >> 3;
 
 		while (true) {
@@ -181,22 +209,22 @@ class ECDH {
 		}
 	}
 
+	/** Generates the public key from the private key.
+	 * @param {BigInt} privateKey - The private key.
+	 * @returns {Point} The public key.
+	 * @throws {Error} If the private key is not in the range [1, n-1].
+	*/
 	generatePublicKey(privateKey) {
-		/** Generates the public key from the private key.
-		 * @param {BigInt} privateKey - The private key.
-		 * @returns {Point} The public key.
-		 * @throws {Error} If the private key is not in the range [1, n-1].
-		*/
 		return this.G.scalarMult(privateKey);
 	}
 
+	/** Generates a shared key using the private key and the other party's public key.
+	 * @param {BigInt} privateKey - The private key.
+	 * @param {Point} otherPublicKey - The other party's public key.
+	 * @returns {Promise<Uint8Array>} The shared key (32 bytes).
+	 * @throws {Error} If the private key is not in the range [1, n-1].
+	 */
 	generateSharedKey(privateKey, otherPublicKey) {
-		/** Generates a shared key using the private key and the other party's public key.
-		 * @param {BigInt} privateKey - The private key.
-		 * @param {Point} otherPublicKey - The other party's public key.
-		 * @returns {Promise<Uint8Array>} The shared key (32 bytes).
-		 * @throws {Error} If the private key is not in the range [1, n-1].
-		 */
 		const sharedSecret = otherPublicKey.scalarMult(privateKey);
 
 		if (sharedSecret.isAtInfinity()) {
@@ -214,11 +242,12 @@ class ECDH {
 		return sha256(sharedSecretBytes);
 	}
 
+	/** 
+	 * Generates a nonce with the first 12 bytes of the key.
+	 * @param {Uint8Array} sharedKey - The shared key (32 bytes).
+	 * @returns {Uint8Array} The nonce (12 bytes).
+	*/
 	generateSharedNonce(sharedKey) {
-		/** Generates a nonce using the shared key.
-		 * @param {Uint8Array} sharedKey - The shared key (32 bytes).
-		 * @returns {Uint8Array} The nonce (12 bytes).
-		*/
 		if (sharedKey.length !== 32) {
 			throw new Error("Shared key must be 32 bytes");
 		}

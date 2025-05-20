@@ -282,6 +282,21 @@ ul {
     text-align: center;
 }
 
+/* Date messages */
+.date {
+    align-self: center;
+    background-color: #e5e7eb; /* light gray */
+    color: #374151; /* dark gray text */
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    margin: 0.5rem 0;
+    text-align: center;
+    max-width: 60%;
+    box-shadow: var(--shadow-sm);
+}
+
 /* Responsive Design */
 @media (max-width: 650px) {
     .content {
