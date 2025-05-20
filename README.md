@@ -47,5 +47,5 @@ To get you IP enter **ipconfig** in **cmd**.
 
 ---
 
-- **GitHub repository: https://github.com/TechWithBar/chat_app**
+- **GitHub repository: https://github.com/TechWithBar/chat_app **
 - **Programed by: Bar Fishilevich**

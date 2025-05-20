@@ -161,7 +161,7 @@ function sendMessage() {
 
 /**
  * Tells the server that the client left and redirects to homepage.
-*/
+ */
 function leave() {
     socketio.emit('leave', { data: 'leave' });
     window.location.href = "/home";
