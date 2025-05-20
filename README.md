@@ -33,8 +33,9 @@ Before running the project, make sure you have:
     python main.py
     ```
 
-Then type in the browser: **https://your_IPv4_address:5000**
-To get you IP enter **ipconfig** in **cmd**.
+- Then type in the browser: **https://your_IPv4_address:5000**
+- To get you IP enter in **cmd**: **ipconfig** 
+
 
 
 ## How to view and edit the code?
