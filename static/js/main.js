@@ -102,7 +102,7 @@ function getDate(date) {
 function addDate(dateString) {
     const dateElement = document.createElement("div");
     dateElement.className = "date";
-    dateElement.textContent = dateString;
+    dateElement.textContent = escapeHTML(dateString);
 
     document.getElementById("messages").appendChild(dateElement);
 }
@@ -117,6 +117,7 @@ function addDate(dateString) {
 function createMessage(name, msg, isYour) {
     // Check if this is your own message to determine the class name
     const messageClass = isYour ? "message outgoing" : "message incoming";
+    name = escapeHTML(name);
     msg = escapeHTML(msg);
 
     const now = getDate(new Date());
