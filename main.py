@@ -3,6 +3,7 @@ from flask_socketio import join_room, leave_room, send, SocketIO, emit
 import random
 from string import ascii_uppercase
 import bcrypt
+import base64
 import os
 import json
 from server_crypto.ecdh import ecdh, Point
@@ -65,13 +66,21 @@ def save_users(users):
         json.dump(users, f)
 
 
+def encode_username(username):
+    """Encode a username to Base64"""
+    return base64.b64encode(username.encode('utf-8')).decode('utf-8')
+
+
 def register(username, password):
     """Adds new user to the json file if it does not already exists."""
     users = load_users()
-    if username in users:
+    encoded_username = encode_username(username)
+
+    if encoded_username in users:
         return "username already exists."
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    users[username] = hashed.decode()
+    
+    hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    users[encoded_username] = hashed_password.decode()
     save_users(users)
     return "User registered successfully."
 
@@ -79,9 +88,12 @@ def register(username, password):
 def login_user(username, password):
     """Login the user if the username and password exist in the users json file."""
     users = load_users()
-    if username not in users:
+    encoded_username = encode_username(username)
+
+    if encoded_username not in users:
         return "username not found."
-    stored_hash = users[username].encode()
+    
+    stored_hash = users[encoded_username].encode()
     if bcrypt.checkpw(password.encode(), stored_hash):
         return "Login successful."
     else:
@@ -111,7 +123,8 @@ def login():
         result = login_user(username, password)
 
         if result == "Login successful.":
-            session['user'] = username
+            encoded_username = encode_username(username)
+            session['user'] = encoded_username
             return redirect(url_for('home'))
         else:
             return render_template('login.html', error=result)
